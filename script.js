@@ -1,195 +1,206 @@
 /**
- * Dr. Rubin Neurosurgery Website
- * Minimal JavaScript for interactivity
+ * Benjamin A. Rubin, MD — Neurosurgery
+ * Progressive enhancement only: the page is fully readable without this file.
  */
 
-(function() {
+(function () {
   'use strict';
 
-  // DOM Elements
-  const header = document.getElementById('header');
-  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-  const mobileMenu = document.getElementById('mobileMenu');
-  const mobileMenuLinks = mobileMenu.querySelectorAll('.mobile-menu__link');
-  const faqItems = document.querySelectorAll('.faq-item');
-  const contactForm = document.getElementById('contactForm');
+  var header = document.getElementById('header');
+  var menuToggle = document.getElementById('menuToggle');
+  var drawer = document.getElementById('drawer');
+  var faqList = document.getElementById('faqList');
+  var form = document.getElementById('inquiryForm');
+  var formStatus = document.getElementById('formStatus');
+  var yearEl = document.getElementById('year');
 
-  /**
-   * Header scroll behavior
-   * Adds shadow when scrolled
-   */
-  function handleHeaderScroll() {
-    if (window.scrollY > 10) {
-      header.classList.add('scrolled');
-    } else {
-      header.classList.remove('scrolled');
-    }
+  /* ---------------------------------------------------------------- Header */
+
+  function syncHeaderState() {
+    header.classList.toggle('is-stuck', window.scrollY > 4);
   }
 
-  /**
-   * Mobile menu toggle
-   */
-  function toggleMobileMenu() {
-    const isOpen = mobileMenu.classList.contains('active');
-    
-    mobileMenu.classList.toggle('active');
-    mobileMenuBtn.classList.toggle('active');
-    mobileMenuBtn.setAttribute('aria-expanded', !isOpen);
-    
-    // Prevent body scroll when menu is open
-    document.body.style.overflow = !isOpen ? 'hidden' : '';
+  /* ---------------------------------------------------------------- Drawer */
+
+  function openDrawer() {
+    drawer.hidden = false;
+    // Allow the element to paint before transitioning opacity.
+    requestAnimationFrame(function () {
+      drawer.classList.add('is-open');
+    });
+    menuToggle.setAttribute('aria-expanded', 'true');
+    menuToggle.setAttribute('aria-label', 'Close menu');
+    document.body.style.overflow = 'hidden';
   }
 
-  /**
-   * Close mobile menu
-   */
-  function closeMobileMenu() {
-    mobileMenu.classList.remove('active');
-    mobileMenuBtn.classList.remove('active');
-    mobileMenuBtn.setAttribute('aria-expanded', 'false');
+  function closeDrawer() {
+    drawer.classList.remove('is-open');
+    menuToggle.setAttribute('aria-expanded', 'false');
+    menuToggle.setAttribute('aria-label', 'Open menu');
     document.body.style.overflow = '';
-  }
 
-  /**
-   * FAQ accordion toggle
-   */
-  function toggleFaqItem(event) {
-    const button = event.currentTarget;
-    const item = button.closest('.faq-item');
-    const isOpen = item.classList.contains('active');
-    
-    // Close all other items
-    faqItems.forEach(function(faq) {
-      if (faq !== item) {
-        faq.classList.remove('active');
-        faq.querySelector('.faq-item__question').setAttribute('aria-expanded', 'false');
+    window.setTimeout(function () {
+      if (!drawer.classList.contains('is-open')) {
+        drawer.hidden = true;
       }
-    });
-    
-    // Toggle current item
-    item.classList.toggle('active');
-    button.setAttribute('aria-expanded', !isOpen);
+    }, 200);
   }
 
-  /**
-   * Smooth scroll for anchor links
-   */
-  function handleSmoothScroll(event) {
-    const href = event.currentTarget.getAttribute('href');
-    
-    if (href.startsWith('#') && href.length > 1) {
-      const target = document.querySelector(href);
-      
-      if (target) {
-        event.preventDefault();
-        
-        // Close mobile menu if open
-        closeMobileMenu();
-        
-        // Calculate offset for fixed header
-        const headerHeight = header.offsetHeight;
-        const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - headerHeight;
-        
-        window.scrollTo({
-          top: targetPosition,
-          behavior: 'smooth'
+  function isDrawerOpen() {
+    return menuToggle.getAttribute('aria-expanded') === 'true';
+  }
+
+  /* ------------------------------------------------------------------- FAQ */
+
+  function closePanel(trigger) {
+    trigger.setAttribute('aria-expanded', 'false');
+    document.getElementById(trigger.getAttribute('aria-controls')).classList.remove('is-open');
+  }
+
+  function handleFaqClick(event) {
+    var trigger = event.target.closest('.faq__trigger');
+    if (!trigger) return;
+
+    var isOpen = trigger.getAttribute('aria-expanded') === 'true';
+
+    faqList.querySelectorAll('.faq__trigger').forEach(function (other) {
+      if (other !== trigger) closePanel(other);
+    });
+
+    if (isOpen) {
+      closePanel(trigger);
+    } else {
+      trigger.setAttribute('aria-expanded', 'true');
+      document.getElementById(trigger.getAttribute('aria-controls')).classList.add('is-open');
+    }
+  }
+
+  /* ------------------------------------------------------------- Scrollspy */
+
+  function initScrollSpy() {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.nav__link'));
+    var sections = links
+      .map(function (link) {
+        return document.querySelector(link.getAttribute('href'));
+      })
+      .filter(Boolean);
+
+    if (!sections.length || !('IntersectionObserver' in window)) return;
+
+    var visible = new Set();
+
+    var observer = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            visible.add(entry.target.id);
+          } else {
+            visible.delete(entry.target.id);
+          }
         });
-      }
-    }
+
+        // Highlight the topmost section currently in view.
+        var current = sections.filter(function (section) {
+          return visible.has(section.id);
+        })[0];
+
+        links.forEach(function (link) {
+          link.classList.toggle(
+            'is-active',
+            Boolean(current) && link.getAttribute('href') === '#' + current.id
+          );
+        });
+      },
+      { rootMargin: '-45% 0px -50% 0px' }
+    );
+
+    sections.forEach(function (section) {
+      observer.observe(section);
+    });
   }
 
-  /**
-   * Form submission handler
-   * Note: This is a placeholder. Connect to actual form handler for production.
-   */
-  function handleFormSubmit(event) {
+  /* ------------------------------------------------------------------ Form */
+
+  function showStatus(message, state) {
+    formStatus.textContent = message;
+    formStatus.dataset.state = state;
+    formStatus.classList.add('is-visible');
+  }
+
+  function handleSubmit(event) {
     event.preventDefault();
-    
-    const formData = new FormData(contactForm);
-    const data = Object.fromEntries(formData.entries());
-    
-    // Validate required fields
-    if (!data.firstName || !data.lastName || !data.email || !data.phone) {
-      alert('Please fill in all required fields.');
+
+    var required = ['firstName', 'lastName', 'phone', 'email'];
+    var firstInvalid = null;
+
+    required.forEach(function (name) {
+      var field = form.elements[name];
+      if (!field.value.trim() && !firstInvalid) firstInvalid = field;
+    });
+
+    if (firstInvalid) {
+      showStatus('Please complete the required fields so we can reach you.', 'error');
+      firstInvalid.focus();
       return;
     }
-    
-    // Basic email validation
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailPattern.test(data.email)) {
-      alert('Please enter a valid email address.');
+
+    var email = form.elements.email;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
+      showStatus('Please enter a valid email address.', 'error');
+      email.focus();
       return;
     }
-    
-    // Show success message (replace with actual form submission)
-    alert('Thank you for your inquiry! We will contact you within 1-2 business days.');
-    contactForm.reset();
-    
-    // In production, you would send the data to a server:
-    // fetch('/api/contact', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(data)
-    // });
+
+    // No backend is connected yet. Wire this submit handler to an approved,
+    // HIPAA-appropriate form service before accepting real patient inquiries.
+    showStatus(
+      'Thank you. Your inquiry has been recorded. For anything time-sensitive, please call (303) 938-5700.',
+      'success'
+    );
+    form.reset();
   }
 
-  /**
-   * Initialize event listeners
-   */
-  function init() {
-    // Header scroll
-    window.addEventListener('scroll', handleHeaderScroll, { passive: true });
-    handleHeaderScroll(); // Check initial state
-    
-    // Mobile menu
-    mobileMenuBtn.addEventListener('click', toggleMobileMenu);
-    
-    // Close mobile menu on link click
-    mobileMenuLinks.forEach(function(link) {
-      link.addEventListener('click', handleSmoothScroll);
-    });
-    
-    // Mobile menu CTA button
-    const mobileCta = mobileMenu.querySelector('.btn--primary');
-    if (mobileCta) {
-      mobileCta.addEventListener('click', handleSmoothScroll);
+  /* ------------------------------------------------------------------ Init */
+
+  window.addEventListener('scroll', syncHeaderState, { passive: true });
+  syncHeaderState();
+
+  menuToggle.addEventListener('click', function () {
+    if (isDrawerOpen()) {
+      closeDrawer();
+    } else {
+      openDrawer();
     }
-    
-    // FAQ accordions
-    faqItems.forEach(function(item) {
-      const button = item.querySelector('.faq-item__question');
-      button.addEventListener('click', toggleFaqItem);
-    });
-    
-    // Smooth scroll for all anchor links
-    document.querySelectorAll('a[href^="#"]').forEach(function(link) {
-      link.addEventListener('click', handleSmoothScroll);
-    });
-    
-    // Contact form
-    if (contactForm) {
-      contactForm.addEventListener('submit', handleFormSubmit);
+  });
+
+  drawer.addEventListener('click', function (event) {
+    if (event.target.closest('a')) closeDrawer();
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && isDrawerOpen()) {
+      closeDrawer();
+      menuToggle.focus();
     }
-    
-    // Close mobile menu on escape key
-    document.addEventListener('keydown', function(event) {
-      if (event.key === 'Escape' && mobileMenu.classList.contains('active')) {
-        closeMobileMenu();
-      }
-    });
-    
-    // Close mobile menu on resize to desktop
-    window.addEventListener('resize', function() {
-      if (window.innerWidth >= 768 && mobileMenu.classList.contains('active')) {
-        closeMobileMenu();
-      }
-    });
+  });
+
+  // Must match the width at which styles.css swaps the drawer for the full nav,
+  // or the drawer can be left open and locking body scroll on desktop.
+  var navBreakpoint = window.matchMedia('(min-width: 1100px)');
+
+  function handleNavBreakpoint(event) {
+    if (event.matches && isDrawerOpen()) closeDrawer();
   }
 
-  // Run when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+  if (navBreakpoint.addEventListener) {
+    navBreakpoint.addEventListener('change', handleNavBreakpoint);
   } else {
-    init();
+    navBreakpoint.addListener(handleNavBreakpoint);
   }
+
+  faqList.addEventListener('click', handleFaqClick);
+  form.addEventListener('submit', handleSubmit);
+  initScrollSpy();
+
+  yearEl.textContent = new Date().getFullYear();
 })();
